@@ -591,8 +591,9 @@ const response = Calendar.Events.list(calendarId, {
 
 If any configured source calendar fails to load, do not send a partial snapshot.
 
-Periodic full sends are due twice per day by default:
+Periodic full sends are due three times per day by default:
 
+- Around 9:00 in the configured timezone.
 - Around 12:00 in the configured timezone.
 - Around 18:00 in the configured timezone.
 
@@ -766,8 +767,8 @@ function deleteTriggers() {}
 Default trigger cadence:
 
 - On each deployed side, install triggers only for the directions configured for that side.
-- Send snapshots twice per day, targeting 12:00 and 18:00 in the configured timezone.
-- Receive snapshots twice per day, targeting 5-10 minutes after the send times, for example 12:10 and 18:10 in the configured timezone.
+- Send snapshots three times per day, targeting 9:00, 12:00, and 18:00 in the configured timezone.
+- Receive snapshots three times per day, targeting 5-10 minutes after the send times, for example 9:10, 12:10, and 18:10 in the configured timezone.
 
 The implementation should create triggers for `send()` and `receive()`. `DEPLOYMENT_SIDE` (`PRIMARY` or `SECONDARY`) decides the active send and receive directions for each deployed side.
 

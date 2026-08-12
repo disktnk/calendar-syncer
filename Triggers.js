@@ -3,8 +3,10 @@ function installTriggers() {
 
   getDeploymentSide();
 
+  createDailyTrigger('send', 9, 0);
   createDailyTrigger('send', 12, 0);
   createDailyTrigger('send', 18, 0);
+  createDailyTrigger('receive', 9, 10);
   createDailyTrigger('receive', 12, 10);
   createDailyTrigger('receive', 18, 10);
 }

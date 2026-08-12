@@ -83,8 +83,8 @@ To show a source account label in destination event titles, set the correspondin
 
 `installTriggers()` creates managed triggers for the configured deployment side:
 
-- Send snapshots around 12:00 and 18:00 in the configured timezone.
-- Receive snapshots around 12:10 and 18:10 in the configured timezone.
+- Send snapshots around 9:00, 12:00, and 18:00 in the configured timezone.
+- Receive snapshots around 9:10, 12:10, and 18:10 in the configured timezone.
 
 `deleteTriggers()` removes only this project's managed send and receive triggers.
 
