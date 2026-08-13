@@ -2,7 +2,7 @@
 
 This Google Apps Script project mirrors busy time between two Google Calendar accounts without sending calendar event details across the account boundary.
 
-The sender reads source calendar events, filters out events that should not be synced, converts eligible events into anonymous busy blocks, signs the snapshot with HMAC-SHA256, and sends it by email. The receiver verifies the signature and creates, updates, or deletes private `Busy` destination events.
+The sender reads source calendar events, filters out events that should not be synced, converts eligible events into anonymous availability blocks, signs the snapshot with HMAC-SHA256, and sends it by email. The receiver verifies the signature and creates, updates, or deletes private destination events.
 
 ## Privacy Model
 
@@ -12,6 +12,7 @@ Only these fields are sent:
 - Start time
 - End time
 - All-day flag
+- Mirror event type, limited to `default` or `outOfOffice`
 - Snapshot metadata
 
 The payload must never include source titles, descriptions, locations, attendees, organizer, creator, Meet URLs, attachments, calendar IDs, event IDs, customer names, or project names.
@@ -22,6 +23,8 @@ Destination mirror events are private busy blocks with:
 - `visibility: 'private'`
 - `transparency: 'opaque'`
 - `extendedProperties.private.busyMirror: '1'`
+
+Timed source out-of-office events are mirrored as Google Calendar `outOfOffice` events with `outOfOfficeProperties.autoDeclineMode: 'declineNone'`, so they show as out of office without automatically declining destination-side invitations. All-day out-of-office source events are ignored.
 
 ## Setup
 

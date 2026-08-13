@@ -13,7 +13,7 @@ Follow `SPEC.md` as the authoritative implementation specification.
 
 ## Core goal
 
-Read events from a source Google Calendar, filter them, anonymize them, send only time blocks to the other side, and create private `Busy` busy blocks in the destination calendar.
+Read events from a source Google Calendar, filter them, anonymize them, send only availability blocks to the other side, and create private destination calendar blocks.
 
 The implementation must prevent source event details from crossing the company/account boundary.
 
@@ -26,6 +26,8 @@ The implementation must prevent source event details from crossing the company/a
 - Do not send source event organizers or creators to the other side.
 - Do not send Meet URLs, conference data, attachments, customer names, raw Calendar IDs, or raw Google Calendar event IDs to the other side.
 - The destination event title must be `Busy`, or `Busy: <label>` when the source account label is configured.
+- Timed source out-of-office events must be mirrored as `eventType: "outOfOffice"` with `outOfOfficeProperties.autoDeclineMode: "declineNone"`.
+- All-day source out-of-office events must not be synced.
 - Destination events must not have attendees.
 - Destination events must not have descriptions, locations, conference data, or attachments.
 - Destination events must set `transparency: "opaque"`.
@@ -109,6 +111,7 @@ The only fields allowed to cross the boundary are:
 - start time
 - end time
 - all-day flag
+- mirror event type, limited to `default` or `outOfOffice`
 - payload metadata such as version, direction, generatedAt, windowStart, and windowEnd
 
 Do not add convenience debugging that prints event summaries.
@@ -137,7 +140,7 @@ The implementation is done when:
 - `runTests()` passes.
 - Sender produces signed anonymous snapshots.
 - Receiver verifies signatures before applying snapshots.
-- Receiver creates only private `Busy` busy blocks.
+- Receiver creates private `Busy` blocks, with timed source out-of-office events mirrored as out-of-office status events.
 - Existing mirror events are updated instead of duplicated.
 - Mirror events missing from the latest snapshot are deleted within the snapshot window.
 - Source event details never appear in outbound payloads, destination events, or logs.

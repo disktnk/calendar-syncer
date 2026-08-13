@@ -4,7 +4,7 @@
 
 Mirror availability between two Google Calendar accounts without exposing event details across the account/company boundary.
 
-The system reads source calendar events, applies filtering rules, converts eligible events into anonymous busy blocks, sends those blocks by email, and creates private `Busy` events in the destination calendar.
+The system reads source calendar events, applies filtering rules, converts eligible events into anonymous availability blocks, sends those blocks by email, and creates private destination events.
 
 The destination side should see only blocked time, not the original title, customer name, attendees, description, location, Meet URL, or other sensitive details.
 
@@ -132,7 +132,7 @@ const CONFIGS = {
     includeEventTypes: ['default', 'focusTime', 'outOfOffice'],
     excludeEventTypes: ['birthday', 'workingLocation', 'fromGmail'],
     includeAllDayDefault: false,
-    includeAllDayOutOfOffice: true,
+    includeAllDayOutOfOffice: false,
     scriptPropertySecretName: 'SYNC_SECRET_PRIMARY_TO_SECONDARY',
     sourceLabelPropertyName: 'PRIMARY_LABEL',
     lastSentHashPropertyName: 'LAST_SENT_HASH_PRIMARY_TO_SECONDARY',
@@ -160,7 +160,7 @@ const CONFIGS = {
     includeEventTypes: ['default', 'focusTime', 'outOfOffice'],
     excludeEventTypes: ['birthday', 'workingLocation', 'fromGmail'],
     includeAllDayDefault: false,
-    includeAllDayOutOfOffice: true,
+    includeAllDayOutOfOffice: false,
     scriptPropertySecretName: 'SYNC_SECRET_SECONDARY_TO_PRIMARY',
     sourceLabelPropertyName: 'SECONDARY_LABEL',
     lastSentHashPropertyName: 'LAST_SENT_HASH_SECONDARY_TO_PRIMARY',
@@ -515,13 +515,13 @@ Attendee-less self-created personal events should be included.
 
 All-day events are excluded by default.
 
-All-day `outOfOffice` events are included by default.
+All-day `outOfOffice` events are excluded because Google Calendar out-of-office status events cannot be all-day events.
 
 Config:
 
 ```javascript
 includeAllDayDefault: false
-includeAllDayOutOfOffice: true
+includeAllDayOutOfOffice: false
 ```
 
 Pseudocode:
@@ -532,9 +532,7 @@ function shouldIncludeAllDayEvent(event, config) {
 
   if (!isAllDay) return true;
 
-  if ((event.eventType || 'default') === 'outOfOffice') {
-    return config.includeAllDayOutOfOffice === true;
-  }
+  if ((event.eventType || 'default') === 'outOfOffice') return false;
 
   return config.includeAllDayDefault === true;
 }
@@ -646,7 +644,7 @@ Processed, ignored, and error-labeled messages do not need to be searched again.
 
 ## 17. Destination event format
 
-Create destination mirror events as follows:
+Create default destination mirror events as follows:
 
 ```javascript
 {
@@ -668,6 +666,36 @@ Create destination mirror events as follows:
   }
 }
 ```
+
+Create timed out-of-office destination mirror events as follows:
+
+```javascript
+{
+  summary: getMirrorEventSummary(config),
+  start: block.start,
+  end: block.end,
+  eventType: 'outOfOffice',
+  outOfOfficeProperties: {
+    autoDeclineMode: 'declineNone'
+  },
+  transparency: 'opaque',
+  visibility: 'private',
+  attendees: [],
+  reminders: {
+    useDefault: false
+  },
+  extendedProperties: {
+    private: {
+      busyMirror: '1',
+      direction: direction,
+      sourceKey: block.sourceKey
+    }
+  }
+}
+```
+
+All-day source out-of-office events are not synced.
+If an existing mirror event must change between `default` and `outOfOffice`, delete and recreate it because Google Calendar event type is immutable after creation.
 
 Do not set:
 
@@ -940,7 +968,7 @@ Test:
 - outOfOffice event is included.
 - focusTime event is included.
 - normal all-day event is excluded by default.
-- all-day outOfOffice event is included by default.
+- all-day outOfOffice event is excluded by default.
 - `busyMirror = "1"` event is excluded.
 
 ### 29.2 sourceKey tests
@@ -1017,7 +1045,7 @@ Implementation is complete when:
 
 - `send()` works on both deployment sides.
 - `receive()` works on both deployment sides.
-- Destination events are created as private `Busy` busy blocks only.
+- Destination events are created as private `Busy` blocks, with timed source out-of-office events mirrored as out-of-office status events.
 - Destination events have no attendees.
 - Source titles never appear in payloads, destination events, or logs.
 - `[nosync]` events are excluded.

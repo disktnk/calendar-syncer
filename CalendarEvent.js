@@ -16,12 +16,21 @@ function blockFromEvent(event, sourceCalendarId, config, secret) {
     sourceKey: buildSourceKey(event, sourceCalendarId, config.direction, secret),
     start: copyCalendarDateTime(event.start),
     end: copyCalendarDateTime(event.end),
-    allDay: !!(event.start && event.start.date)
+    allDay: !!(event.start && event.start.date),
+    eventType: mirrorEventTypeOfEvent(event)
   };
 }
 
 function copyCalendarDateTime(value) {
   return JSON.parse(JSON.stringify(value || {}));
+}
+
+function mirrorEventTypeOfEvent(event) {
+  return event && event.eventType === 'outOfOffice' ? 'outOfOffice' : 'default';
+}
+
+function mirrorEventTypeOfBlock(block) {
+  return block && block.eventType === 'outOfOffice' ? 'outOfOffice' : 'default';
 }
 
 function compareBlocks(a, b) {
@@ -31,7 +40,7 @@ function compareBlocks(a, b) {
 }
 
 function createMirrorEventResource(block, config) {
-  return {
+  const resource = {
     summary: getMirrorEventSummary(config),
     start: copyCalendarDateTime(block.start),
     end: copyCalendarDateTime(block.end),
@@ -49,6 +58,15 @@ function createMirrorEventResource(block, config) {
       }
     }
   };
+
+  if (mirrorEventTypeOfBlock(block) === 'outOfOffice') {
+    resource.eventType = 'outOfOffice';
+    resource.outOfOfficeProperties = {
+      autoDeclineMode: 'declineNone'
+    };
+  }
+
+  return resource;
 }
 
 function privatePropsOf(event) {
@@ -62,9 +80,14 @@ function calendarDateTimesEqual(a, b) {
 function eventsEqualManagedState(event, block, config) {
   const props = privatePropsOf(event);
   const attendees = event.attendees || [];
+  const blockEventType = mirrorEventTypeOfBlock(block);
+  const eventEventType = event.eventType || 'default';
+  const outOfOfficeProperties = event.outOfOfficeProperties || {};
   return event.summary === getMirrorEventSummary(config) &&
     calendarDateTimesEqual(event.start, block.start) &&
     calendarDateTimesEqual(event.end, block.end) &&
+    eventEventType === blockEventType &&
+    (blockEventType !== 'outOfOffice' || outOfOfficeProperties.autoDeclineMode === 'declineNone') &&
     event.transparency === 'opaque' &&
     event.visibility === 'private' &&
     attendees.length === 0 &&
@@ -75,6 +98,10 @@ function eventsEqualManagedState(event, block, config) {
     props.busyMirror === '1' &&
     props.direction === config.direction &&
     props.sourceKey === block.sourceKey;
+}
+
+function mirrorEventTypeChanged(existing, block) {
+  return (existing.eventType || 'default') !== mirrorEventTypeOfBlock(block);
 }
 
 function eventOverlapsWindow(event, windowStart, windowEnd) {
@@ -212,6 +239,10 @@ function applySnapshotPayload(payload, config, calendarApi) {
     if (!existing) {
       api.insert(resource, config.destinationCalendarId);
       stats.created += 1;
+    } else if (mirrorEventTypeChanged(existing, block)) {
+      api.remove(config.destinationCalendarId, existing.id);
+      api.insert(resource, config.destinationCalendarId);
+      stats.updated += 1;
     } else if (!eventsEqualManagedState(existing, block, config)) {
       api.update(resource, config.destinationCalendarId, existing.id);
       stats.updated += 1;

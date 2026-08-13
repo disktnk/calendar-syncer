@@ -7,6 +7,7 @@ function runTests() {
     testSourceKey,
     testPayloadPrivacyAndSignature,
     testApplySnapshotInsertIdempotentUpdateDelete,
+    testOutOfOfficeMirrorEvents,
     testInvalidSignature,
     testStaleGeneratedAtComparison,
     testConfiguredWindowDaysOverride,
@@ -125,7 +126,7 @@ function testAllDayFiltering() {
   const allDayStart = { date: '2026-08-03' };
   const allDayEnd = { date: '2026-08-04' };
   assertFalse(shouldSyncEvent(baseEvent({ start: allDayStart, end: allDayEnd }), 'primary', config), 'normal all-day event is excluded');
-  assertTrue(shouldSyncEvent(baseEvent({ start: allDayStart, end: allDayEnd, eventType: 'outOfOffice' }), 'primary', config), 'all-day outOfOffice event is included');
+  assertFalse(shouldSyncEvent(baseEvent({ start: allDayStart, end: allDayEnd, eventType: 'outOfOffice' }), 'primary', config), 'all-day outOfOffice event is excluded');
 }
 
 function testSourceKey() {
@@ -243,6 +244,58 @@ function testApplySnapshotInsertIdempotentUpdateDelete() {
     ]);
     applySnapshotPayload(emptyPayload, config, nonMirrorApi);
     assertEqual(nonMirrorApi.events.length, 1, 'non-mirror destination event is never deleted');
+  } finally {
+    getScriptProperties = originalGetScriptProperties;
+  }
+}
+
+function testOutOfOfficeMirrorEvents() {
+  const originalGetScriptProperties = getScriptProperties;
+  const config = testConfig();
+  const event = baseEvent({ eventType: 'outOfOffice' });
+  const block = blockFromEvent(event, 'source-calendar-id', config, 'test-secret');
+  const payload = {
+    version: 1,
+    direction: config.direction,
+    generatedAt: '2026-07-30T03:00:00.000Z',
+    windowStart: '2026-07-30T00:00:00+09:00',
+    windowEnd: '2026-09-03T00:00:00+09:00',
+    blocks: [block]
+  };
+
+  try {
+    getScriptProperties = function() {
+      return {
+        getProperty: function() {
+          return null;
+        }
+      };
+    };
+
+    assertEqual(block.eventType, 'outOfOffice', 'outOfOffice event type is included in the block');
+
+    const api = createMockCalendarApi([]);
+    let stats = applySnapshotPayload(payload, config, api);
+    assertEqual(stats.created, 1, 'outOfOffice block inserts event');
+    assertEqual(api.events[0].eventType, 'outOfOffice', 'destination event is outOfOffice');
+    assertEqual(api.events[0].outOfOfficeProperties.autoDeclineMode, 'declineNone', 'destination outOfOffice does not auto-decline');
+
+    stats = applySnapshotPayload(payload, config, api);
+    assertEqual(stats.unchanged, 1, 'same outOfOffice snapshot is unchanged');
+
+    const existingDefaultApi = createMockCalendarApi([
+      createMirrorEventResource({
+        sourceKey: block.sourceKey,
+        start: block.start,
+        end: block.end,
+        allDay: false
+      }, config)
+    ]);
+    existingDefaultApi.events[0].id = 'existing-default';
+    stats = applySnapshotPayload(payload, config, existingDefaultApi);
+    assertEqual(stats.updated, 1, 'default mirror is recreated when it becomes outOfOffice');
+    assertEqual(existingDefaultApi.events.length, 1, 'recreate leaves one mirror event');
+    assertEqual(existingDefaultApi.events[0].eventType, 'outOfOffice', 'recreated event is outOfOffice');
   } finally {
     getScriptProperties = originalGetScriptProperties;
   }
