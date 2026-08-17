@@ -13,7 +13,8 @@ function runTests() {
     testConfiguredWindowDaysOverride,
     testConfiguredEmailProperties,
     testMirrorEventSummaryLabel,
-    testDeploymentSideEntryPoints
+    testDeploymentSideEntryPoints,
+    testWeekdayEntryPointGuard
   ];
 
   tests.forEach(function(test) {
@@ -395,6 +396,7 @@ function testMirrorEventSummaryLabel() {
 
 function testDeploymentSideEntryPoints() {
   const originalGetDeploymentSide = getDeploymentSide;
+  const originalIsWeekdayInTimezone = isWeekdayInTimezone;
   const originalSendOutgoingSnapshot = sendOutgoingSnapshot;
   const originalProcessIncomingSnapshots = processIncomingSnapshots;
   const calls = [];
@@ -402,6 +404,9 @@ function testDeploymentSideEntryPoints() {
   try {
     getDeploymentSide = function() {
       return DEPLOYMENT_SIDES.SECONDARY;
+    };
+    isWeekdayInTimezone = function() {
+      return true;
     };
     sendOutgoingSnapshot = function(direction) {
       calls.push({ type: 'send', direction: direction });
@@ -419,6 +424,40 @@ function testDeploymentSideEntryPoints() {
     ], 'entry points use DEPLOYMENT_SIDE directions');
   } finally {
     getDeploymentSide = originalGetDeploymentSide;
+    isWeekdayInTimezone = originalIsWeekdayInTimezone;
+    sendOutgoingSnapshot = originalSendOutgoingSnapshot;
+    processIncomingSnapshots = originalProcessIncomingSnapshots;
+  }
+}
+
+function testWeekdayEntryPointGuard() {
+  const originalGetDeploymentSide = getDeploymentSide;
+  const originalIsWeekdayInTimezone = isWeekdayInTimezone;
+  const originalSendOutgoingSnapshot = sendOutgoingSnapshot;
+  const originalProcessIncomingSnapshots = processIncomingSnapshots;
+  const calls = [];
+
+  try {
+    getDeploymentSide = function() {
+      return DEPLOYMENT_SIDES.PRIMARY;
+    };
+    isWeekdayInTimezone = function(timezone) {
+      assertEqual(timezone, CONFIGS.PRIMARY_TO_SECONDARY.timezone, 'weekday guard uses configured timezone');
+      return false;
+    };
+    sendOutgoingSnapshot = function(direction) {
+      calls.push({ type: 'send', direction: direction });
+    };
+    processIncomingSnapshots = function(direction) {
+      calls.push({ type: 'receive', direction: direction });
+    };
+
+    assertDeepEqual(send(), { skipped: true, reason: 'weekend' }, 'send skips on weekend');
+    assertDeepEqual(receive(), { skipped: true, reason: 'weekend' }, 'receive skips on weekend');
+    assertDeepEqual(calls, [], 'weekend guard prevents send and receive work');
+  } finally {
+    getDeploymentSide = originalGetDeploymentSide;
+    isWeekdayInTimezone = originalIsWeekdayInTimezone;
     sendOutgoingSnapshot = originalSendOutgoingSnapshot;
     processIncomingSnapshots = originalProcessIncomingSnapshots;
   }

@@ -29,6 +29,8 @@ function deleteTriggers() {
 }
 
 function createDailyTrigger(functionName, hour, minute) {
+  // Keep these daily and let send()/receive() skip weekends. Expanding 6 daily
+  // triggers across 5 weekdays would exceed Apps Script's 20 triggers/script limit.
   ScriptApp.newTrigger(functionName)
     .timeBased()
     .everyDays(1)

@@ -1,9 +1,42 @@
 function send() {
-  return sendOutgoingSnapshot(getSendDirectionForDeployment(getDeploymentSide()));
+  const direction = getSendDirectionForDeployment(getDeploymentSide());
+  if (!shouldRunOnWeekday(direction, new Date())) {
+    logInfo('send skipped on weekend', { direction: direction });
+    return {
+      skipped: true,
+      reason: 'weekend'
+    };
+  }
+  return sendOutgoingSnapshot(direction);
 }
 
 function receive() {
-  return processIncomingSnapshots(getReceiveDirectionForDeployment(getDeploymentSide()));
+  const direction = getReceiveDirectionForDeployment(getDeploymentSide());
+  if (!shouldRunOnWeekday(direction, new Date())) {
+    logInfo('receive skipped on weekend', { direction: direction });
+    return {
+      skipped: true,
+      reason: 'weekend'
+    };
+  }
+  return processIncomingSnapshots(direction);
+}
+
+function shouldRunOnWeekday(direction, now) {
+  const config = CONFIGS[direction];
+  if (!config) {
+    throw new Error('Unknown sync direction: ' + direction);
+  }
+  return isWeekdayInTimezone(config.timezone, now);
+}
+
+function isWeekdayInTimezone(timezone, now) {
+  const dateText = Utilities.formatDate(now || new Date(), timezone, 'yyyy-MM-dd');
+  const parts = dateText.split('-').map(function(part) {
+    return Number(part);
+  });
+  const day = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay();
+  return day >= 1 && day <= 5;
 }
 
 function withScriptLock(fn) {
