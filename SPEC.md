@@ -795,9 +795,10 @@ function deleteTriggers() {}
 Default trigger cadence:
 
 - On each deployed side, install triggers only for the directions configured for that side.
-- Send snapshots three times per day, targeting 9:00, 12:00, and 18:00 in the configured timezone.
-- Receive snapshots three times per day, targeting 5-10 minutes after the send times, for example 9:10, 12:10, and 18:10 in the configured timezone.
-- `send()` and `receive()` only perform sync work on weekdays, Monday through Friday, in the configured timezone. Weekend invocations return without syncing.
+- Send snapshots four times per day, targeting 9:00, 12:00, 15:00, and 18:00 in the configured timezone.
+- Receive snapshots every 15 minutes.
+- `send()` and `receive()` only perform sync work on weekdays, Monday through Friday, in the configured timezone.
+- `receive()` only processes snapshots from 8:30 through 18:30 in the configured timezone. Other receive invocations return without syncing.
 
 The implementation should create triggers for `send()` and `receive()`. `DEPLOYMENT_SIDE` (`PRIMARY` or `SECONDARY`) decides the active send and receive directions for each deployed side.
 

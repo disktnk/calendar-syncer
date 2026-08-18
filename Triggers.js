@@ -5,10 +5,9 @@ function installTriggers() {
 
   createDailyTrigger('send', 9, 0);
   createDailyTrigger('send', 12, 0);
+  createDailyTrigger('send', 15, 0);
   createDailyTrigger('send', 18, 0);
-  createDailyTrigger('receive', 9, 10);
-  createDailyTrigger('receive', 12, 10);
-  createDailyTrigger('receive', 18, 10);
+  createIntervalTrigger('receive', 15);
 }
 
 function deleteTriggers() {
@@ -29,12 +28,19 @@ function deleteTriggers() {
 }
 
 function createDailyTrigger(functionName, hour, minute) {
-  // Keep these daily and let send()/receive() skip weekends. Expanding 6 daily
-  // triggers across 5 weekdays would exceed Apps Script's 20 triggers/script limit.
   ScriptApp.newTrigger(functionName)
     .timeBased()
     .everyDays(1)
     .atHour(hour)
     .nearMinute(minute)
+    .create();
+}
+
+function createIntervalTrigger(functionName, minutes) {
+  // Keep receive as one interval trigger and let receive() skip weekends and
+  // off-hours. Time-bounded 15-minute triggers would exceed Apps Script's limit.
+  ScriptApp.newTrigger(functionName)
+    .timeBased()
+    .everyMinutes(minutes)
     .create();
 }

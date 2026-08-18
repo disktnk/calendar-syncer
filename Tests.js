@@ -14,7 +14,8 @@ function runTests() {
     testConfiguredEmailProperties,
     testMirrorEventSummaryLabel,
     testDeploymentSideEntryPoints,
-    testWeekdayEntryPointGuard
+    testWeekdayEntryPointGuard,
+    testReceiveTimeWindowGuard
   ];
 
   tests.forEach(function(test) {
@@ -397,6 +398,7 @@ function testMirrorEventSummaryLabel() {
 function testDeploymentSideEntryPoints() {
   const originalGetDeploymentSide = getDeploymentSide;
   const originalIsWeekdayInTimezone = isWeekdayInTimezone;
+  const originalIsReceiveWindowInTimezone = isReceiveWindowInTimezone;
   const originalSendOutgoingSnapshot = sendOutgoingSnapshot;
   const originalProcessIncomingSnapshots = processIncomingSnapshots;
   const calls = [];
@@ -406,6 +408,9 @@ function testDeploymentSideEntryPoints() {
       return DEPLOYMENT_SIDES.SECONDARY;
     };
     isWeekdayInTimezone = function() {
+      return true;
+    };
+    isReceiveWindowInTimezone = function() {
       return true;
     };
     sendOutgoingSnapshot = function(direction) {
@@ -425,6 +430,7 @@ function testDeploymentSideEntryPoints() {
   } finally {
     getDeploymentSide = originalGetDeploymentSide;
     isWeekdayInTimezone = originalIsWeekdayInTimezone;
+    isReceiveWindowInTimezone = originalIsReceiveWindowInTimezone;
     sendOutgoingSnapshot = originalSendOutgoingSnapshot;
     processIncomingSnapshots = originalProcessIncomingSnapshots;
   }
@@ -433,6 +439,7 @@ function testDeploymentSideEntryPoints() {
 function testWeekdayEntryPointGuard() {
   const originalGetDeploymentSide = getDeploymentSide;
   const originalIsWeekdayInTimezone = isWeekdayInTimezone;
+  const originalIsReceiveWindowInTimezone = isReceiveWindowInTimezone;
   const originalSendOutgoingSnapshot = sendOutgoingSnapshot;
   const originalProcessIncomingSnapshots = processIncomingSnapshots;
   const calls = [];
@@ -444,6 +451,9 @@ function testWeekdayEntryPointGuard() {
     isWeekdayInTimezone = function(timezone) {
       assertEqual(timezone, CONFIGS.PRIMARY_TO_SECONDARY.timezone, 'weekday guard uses configured timezone');
       return false;
+    };
+    isReceiveWindowInTimezone = function() {
+      return true;
     };
     sendOutgoingSnapshot = function(direction) {
       calls.push({ type: 'send', direction: direction });
@@ -458,7 +468,40 @@ function testWeekdayEntryPointGuard() {
   } finally {
     getDeploymentSide = originalGetDeploymentSide;
     isWeekdayInTimezone = originalIsWeekdayInTimezone;
+    isReceiveWindowInTimezone = originalIsReceiveWindowInTimezone;
     sendOutgoingSnapshot = originalSendOutgoingSnapshot;
+    processIncomingSnapshots = originalProcessIncomingSnapshots;
+  }
+}
+
+function testReceiveTimeWindowGuard() {
+  const originalGetDeploymentSide = getDeploymentSide;
+  const originalIsWeekdayInTimezone = isWeekdayInTimezone;
+  const originalIsReceiveWindowInTimezone = isReceiveWindowInTimezone;
+  const originalProcessIncomingSnapshots = processIncomingSnapshots;
+  const calls = [];
+
+  try {
+    getDeploymentSide = function() {
+      return DEPLOYMENT_SIDES.SECONDARY;
+    };
+    isWeekdayInTimezone = function() {
+      return true;
+    };
+    isReceiveWindowInTimezone = function(timezone) {
+      assertEqual(timezone, CONFIGS.PRIMARY_TO_SECONDARY.timezone, 'receive window uses configured timezone');
+      return false;
+    };
+    processIncomingSnapshots = function(direction) {
+      calls.push({ type: 'receive', direction: direction });
+    };
+
+    assertDeepEqual(receive(), { skipped: true, reason: 'outside_receive_window' }, 'receive skips outside configured window');
+    assertDeepEqual(calls, [], 'receive window guard prevents receive work');
+  } finally {
+    getDeploymentSide = originalGetDeploymentSide;
+    isWeekdayInTimezone = originalIsWeekdayInTimezone;
+    isReceiveWindowInTimezone = originalIsReceiveWindowInTimezone;
     processIncomingSnapshots = originalProcessIncomingSnapshots;
   }
 }
