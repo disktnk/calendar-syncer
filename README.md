@@ -31,7 +31,7 @@ Timed source out-of-office events are mirrored as Google Calendar `outOfOffice` 
 1. Create an Apps Script project for the primary side.
 2. Create another Apps Script project for the secondary side.
 3. Copy the same source files into both projects.
-4. Enable the Advanced Google Calendar API in each Apps Script project.
+4. Enable the Advanced Google Calendar API and Advanced Gmail API in each Apps Script project.
 5. Set the account email script properties described below.
 6. Set script properties in each deployment.
 7. Run `runTests()` manually.

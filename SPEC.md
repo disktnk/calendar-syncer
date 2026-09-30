@@ -56,7 +56,8 @@ Use:
 - Google Apps Script
 - V8 runtime
 - Advanced Google Calendar API
-- GmailApp or Gmail API equivalent
+- Advanced Gmail API for sending and trashing outbound snapshot messages
+- GmailApp or Gmail API equivalent for receiving, searching, and labeling messages
 - PropertiesService
 - LockService
 
@@ -570,9 +571,13 @@ Algorithm:
 14. Serialize payload to `payloadJson`.
 15. Compute HMAC signature over `payloadJson`.
 16. Compare current payload hash with last sent hash.
-17. Send email only when the payload changed or a periodic full send is due.
-18. Store last sent hash and last sent timestamp in `PropertiesService`.
-19. Log only metadata and counts.
+17. Send the snapshot through the Gmail API only when the payload changed or a periodic full send is due.
+18. Obtain the sent message ID from the Gmail API response.
+19. Move that exact sent message to the Gmail trash using the returned message ID.
+20. Store the last sent hash and last sent timestamp in `PropertiesService` only after sending and trashing succeed.
+21. Log only metadata and counts.
+
+The sender must not search by subject or otherwise infer the sent message when moving it to the trash. The recipient still receives the email normally; only the sender's copy is moved to the trash.
 
 Calendar list pseudocode:
 
@@ -830,6 +835,11 @@ Example:
         "userSymbol": "Calendar",
         "serviceId": "calendar",
         "version": "v3"
+      },
+      {
+        "userSymbol": "Gmail",
+        "serviceId": "gmail",
+        "version": "v1"
       }
     ]
   },
@@ -884,6 +894,7 @@ Forbidden logs:
 - Do not send partial snapshots.
 - If HMAC secret is missing, fail closed.
 - If Gmail send fails, do not update last sent hash or timestamp.
+- If moving the sent message to the trash fails, do not update last sent hash or timestamp.
 - Log only non-sensitive metadata.
 
 ### 26.2 Receiver
