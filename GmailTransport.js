@@ -7,7 +7,35 @@ function sendSnapshotEmail(config, payloadJson, signature, generatedAt) {
     payloadJson: payloadJson,
     signature: signature
   };
-  GmailApp.sendEmail(config.recipientEmail, buildSubject(config, generatedAt), JSON.stringify(envelope));
+  const subject = buildSubject(config, generatedAt);
+  const body = JSON.stringify(envelope);
+  const rawMessage = [
+    'To: ' + config.recipientEmail,
+    'Subject: ' + encodeMimeHeader(subject),
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    body
+  ].join('\r\n');
+  const response = Gmail.Users.Messages.send({
+    raw: Utilities.base64EncodeWebSafe(Utilities.newBlob(rawMessage).getBytes())
+  }, 'me');
+
+  if (!response || !response.id) {
+    throw new Error('Gmail API did not return a sent message ID');
+  }
+
+  // Trash only the exact sent message returned by the send operation.
+  Gmail.Users.Messages.trash('me', response.id);
+  return response.id;
+}
+
+function encodeMimeHeader(value) {
+  if (/^[\x20-\x7E]*$/.test(value)) {
+    return value;
+  }
+  return '=?UTF-8?B?' + Utilities.base64Encode(Utilities.newBlob(value).getBytes()) + '?=';
 }
 
 function getOrCreateGmailLabel(name) {
